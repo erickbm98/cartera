@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cartera">
+<meta name="theme-color" content="#0a0b0d">
+<title>Cartera</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg: #0a0b0d; --s1: #13151a; --s2: #1a1d24; --s3: #22252e;
+  --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+  --text: #f0ede8; --muted: #6e717a; --muted2: #3d4048;
+  --accent: #e8c56a; --accent-dim: rgba(232,197,106,0.15);
+  --blue: #5b8dee; --blue-dim: rgba(91,141,238,0.15);
+  --purple: #9b7fe8; --purple-dim: rgba(155,127,232,0.15);
+  --green: #4ecb8d; --red: #e8685b;
+  --safe-top: env(safe-area-inset-top, 44px);
+  --safe-bot: env(safe-area-inset-bottom, 34px);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); }
+body { font-family: 'Syne', sans-serif; color: var(--text); overscroll-behavior: none; }
+#app { display: flex; flex-direction: column; height: 100%; }
+.status-bar { height: var(--safe-top); background: var(--bg); flex-shrink: 0; }
+
+/* TOAST */
+.toast {
+  position: fixed; top: calc(var(--safe-top) + 12px); left: 50%;
+  transform: translateX(-50%) translateY(-80px);
+  background: var(--green); color: #0a0b0d; font-family: 'DM Mono', monospace;
+  font-size: 13px; font-weight: 500; padding: 10px 22px; border-radius: 30px;
+  z-index: 999; transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1); white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.error { background: var(--red); color: #fff; }
+
+/* TABS */
+.tab-bar { display: flex; background: var(--s1); border-top: 1px solid var(--border); padding-bottom: var(--safe-bot); flex-shrink: 0; z-index: 10; }
+.tab-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px 0; background: none; border: none; color: var(--muted); cursor: pointer; font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 500; letter-spacing: 0.04em; transition: color 0.2s; }
+.tab-btn.active { color: var(--accent); }
+.tab-icon { width: 22px; height: 22px; }
+
+/* PAGES */
+.pages { flex: 1; overflow: hidden; position: relative; }
+.page { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 20px 20px 28px; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity 0.25s, transform 0.25s; }
+.page.active { opacity: 1; pointer-events: all; transform: translateY(0); }
+
+/* HERO */
+.hero { background: var(--s1); border: 1px solid var(--border); border-radius: 20px; padding: 20px 22px; margin-bottom: 16px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -40px; right: -40px; width: 120px; height: 120px; border-radius: 50%; background: var(--accent-dim); filter: blur(30px); pointer-events: none; }
+.hero-label { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+.hero-value { font-family: 'DM Serif Display', serif; font-size: 42px; line-height: 1; letter-spacing: -1.5px; color: var(--text); }
+.hero-value sup { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 400; opacity: 0.5; vertical-align: top; margin-top: 6px; margin-right: 3px; }
+.hero-sub { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.hero-btc { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--accent); }
+.hero-btc-note { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.hero-btc-change { font-family: 'DM Mono', monospace; font-size: 12px; text-align: right; }
+
+/* METRICS */
+.metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.metric-card { background: var(--s1); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; border-top: 2px solid var(--card-color, var(--accent)); }
+.metric-card .lbl { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+.metric-card .val { font-family: 'DM Serif Display', serif; font-size: 22px; line-height: 1.1; }
+.metric-card .sub { font-size: 10px; color: var(--muted2); margin-top: 4px; font-family: 'DM Mono', monospace; }
+
+/* POSITIONS */
+.positions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.position-row { background: var(--s1); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+.pos-badge { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; }
+.pos-info { flex: 1; min-width: 0; }
+.pos-name { font-size: 14px; font-weight: 500; }
+.pos-type { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.pos-right { text-align: right; }
+.pos-val { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 500; }
+.pos-pct { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 2px; }
+.pos-pl { font-size: 11px; font-family: 'DM Mono', monospace; margin-top: 2px; }
+
+/* CHART */
+.chart-card { background: var(--s1); border: 1px solid var(--border); border-radius: 20px; padding: 18px; margin-bottom: 16px; }
+.chart-title { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 14px; }
+.donut-wrap { position: relative; height: 180px; }
+.donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+.donut-center-val { font-family: 'DM Serif Display', serif; font-size: 24px; color: var(--text); }
+.donut-center-lbl { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 2px; }
+.legend-list { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.legend-name { color: var(--muted); flex: 1; }
+.legend-val { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text); }
+.legend-pct { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted2); min-width: 36px; text-align: right; }
+
+/* EDIT */
+.page-title { font-family: 'DM Serif Display', serif; font-size: 28px; letter-spacing: -0.5px; margin-bottom: 4px; }
+.page-title span { color: var(--accent); }
+.page-sub { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 20px; }
+
+.btn-save {
+  width: 100%; padding: 17px; background: var(--accent); border: none; border-radius: 14px;
+  color: #0a0b0d; font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700;
+  cursor: pointer; margin-bottom: 24px; display: flex; align-items: center; justify-content: center;
+  gap: 8px; transition: opacity 0.15s, transform 0.15s;
+}
+.btn-save:active { opacity: 0.82; transform: scale(0.98); }
+
+.section-hdr { font-size: 10px; color: var(--muted2); font-family: 'DM Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; padding: 0 4px 8px; border-bottom: 1px solid var(--border); margin-bottom: 12px; margin-top: 20px; }
+.section-hdr:first-of-type { margin-top: 0; }
+
+.field-block { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.field-lbl { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; display: flex; justify-content: space-between; }
+.field-lbl em { color: var(--muted2); font-style: normal; font-size: 10px; }
+.field-input { background: var(--s2); border: 1px solid var(--border2); border-radius: 10px; padding: 13px 14px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 16px; width: 100%; outline: none; -webkit-appearance: none; transition: border-color 0.2s, box-shadow 0.2s; }
+.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(232,197,106,0.1); }
+.field-input::placeholder { color: var(--muted2); }
+
+.fund-card { background: var(--s2); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 10px; position: relative; }
+.fund-card-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.fund-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.fund-name-input { background: transparent; border: none; border-bottom: 1px solid var(--border2); color: var(--text); font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 500; flex: 1; outline: none; padding-bottom: 3px; transition: border-color 0.2s; }
+.fund-name-input:focus { border-bottom-color: var(--accent); }
+.fund-val-row { display: flex; align-items: center; gap: 8px; }
+.fund-val-lbl { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; min-width: 50px; }
+.fund-val-input { background: var(--s3); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 12px; color: var(--accent); font-family: 'DM Mono', monospace; font-size: 16px; flex: 1; outline: none; -webkit-appearance: none; transition: border-color 0.2s; }
+.fund-val-input:focus { border-color: var(--accent); }
+.btn-remove { position: absolute; top: 10px; right: 10px; background: var(--s3); border: 1px solid var(--border2); border-radius: 6px; color: var(--muted); font-size: 13px; padding: 4px 10px; cursor: pointer; }
+.btn-remove:active { color: var(--red); }
+.btn-add-fund { width: 100%; padding: 13px; background: none; border: 1px dashed var(--muted2); border-radius: 12px; color: var(--muted); font-family: 'Syne', sans-serif; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
+.btn-add-fund:active { color: var(--accent); border-color: var(--accent); }
+
+/* INFO */
+.info-card { background: var(--s1); border: 1px solid var(--border); border-radius: 16px; padding: 18px; margin-bottom: 12px; }
+.info-card-title { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 12px; }
+.info-steps { display: flex; flex-direction: column; gap: 12px; }
+.info-step { display: flex; gap: 12px; align-items: flex-start; }
+.step-num { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.step-text { font-size: 13px; color: var(--muted); line-height: 1.55; }
+.step-text strong { color: var(--text); font-weight: 500; }
+.info-note { font-size: 11px; color: var(--muted2); font-family: 'DM Mono', monospace; text-align: center; padding: 16px 0 0; }
+
+::-webkit-scrollbar { width: 0; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.hero { animation: fadeUp 0.4s ease both; }
+.metrics-grid { animation: fadeUp 0.4s 0.06s ease both; }
+.positions { animation: fadeUp 0.4s 0.1s ease both; }
+.chart-card { animation: fadeUp 0.4s 0.14s ease both; }
+</style>
+</head>
+<body>
+<div id="toast" class="toast">✓ Guardado</div>
+<div id="app">
+  <div class="status-bar"></div>
+  <div class="pages">
+
+    <!-- INICIO -->
+    <div class="page active" id="page-home">
+      <div class="hero">
+        <div class="hero-label">valor total</div>
+        <div class="hero-value"><sup>€</sup><span id="h-total">0</span></div>
+        <div class="hero-sub">
+          <div><div class="hero-btc" id="h-btc-price">—</div><div class="hero-btc-note">BTC / EUR</div></div>
+          <div class="hero-btc-change" id="h-btc-change">—</div>
+        </div>
+      </div>
+      <div class="metrics-grid" id="metrics-grid"></div>
+      <div class="positions" id="positions-list"></div>
+      <div class="chart-card">
+        <div class="chart-title">distribución de cartera</div>
+        <div class="donut-wrap">
+          <canvas id="donutChart"></canvas>
+          <div class="donut-center">
+            <div class="donut-center-val" id="donut-n">—</div>
+            <div class="donut-center-lbl">activos</div>
+          </div>
+        </div>
+        <div class="legend-list" id="legend-list"></div>
+      </div>
+    </div>
+
+    <!-- EDITAR -->
+    <div class="page" id="page-edit">
+      <div class="page-title">Editar <span>datos</span></div>
+      <div class="page-sub" id="save-status">Pulsa guardar después de cambiar los datos</div>
+
+      <button class="btn-save" onclick="saveData()">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 9l5 5 7-8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Guardar cambios
+      </button>
+
+      <div class="section-hdr">Bitcoin</div>
+      <div class="field-block">
+        <div class="field-lbl">Cantidad BTC</div>
+        <input class="field-input" id="e-btc-amount" type="number" inputmode="decimal" step="0.00000001" placeholder="0.00000000">
+      </div>
+      <div class="field-block">
+        <div class="field-lbl">Precio manual EUR <em>vacío = automático</em></div>
+        <input class="field-input" id="e-btc-manual" type="number" inputmode="decimal" step="1" placeholder="Auto (CoinGecko)">
+      </div>
+      <div class="field-block">
+        <div class="field-lbl">Precio de coste medio <em>para ver P&L</em></div>
+        <input class="field-input" id="e-btc-cost" type="number" inputmode="decimal" step="1" placeholder="Opcional">
+      </div>
+
+      <div class="section-hdr">Fondos de inversión</div>
+      <div id="funds-edit-list"></div>
+      <button class="btn-add-fund" onclick="addFund()">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Añadir fondo
+      </button>
+
+      <button class="btn-save" style="margin-top: 8px;" onclick="saveData()">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 9l5 5 7-8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Guardar cambios
+      </button>
+    </div>
+
+    <!-- INSTALAR -->
+    <div class="page" id="page-info">
+      <div class="page-title">Instalar <span>app</span></div>
+      <div class="info-card">
+        <div class="info-card-title">Añadir a pantalla de inicio</div>
+        <div class="info-steps">
+          <div class="info-step"><div class="step-num">1</div><div class="step-text">Abre este archivo en <strong>Safari</strong> (no Chrome ni Firefox)</div></div>
+          <div class="info-step"><div class="step-num">2</div><div class="step-text">Pulsa el botón <strong>compartir ↑</strong> en la barra inferior de Safari</div></div>
+          <div class="info-step"><div class="step-num">3</div><div class="step-text">Desplázate y pulsa <strong>"Añadir a pantalla de inicio"</strong></div></div>
+          <div class="info-step"><div class="step-num">4</div><div class="step-text">Pulsa <strong>"Añadir"</strong> — el icono aparecerá en tu inicio</div></div>
+        </div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-title">Sobre el guardado de datos</div>
+        <div class="info-steps">
+          <div class="info-step">
+            <div class="step-num" style="background:var(--accent-dim);color:var(--accent)">!</div>
+            <div class="step-text">Siempre pulsa <strong>"Guardar cambios"</strong> tras editar. Los datos se guardan en tu iPhone con IndexedDB.</div>
+          </div>
+          <div class="info-step">
+            <div class="step-num" style="background:var(--blue-dim);color:var(--blue)">i</div>
+            <div class="step-text">Si los datos no se guardan, ve a <strong>Ajustes → Safari → Avanzado → Datos de sitios web</strong> y verifica que el almacenamiento no está bloqueado.</div>
+          </div>
+        </div>
+      </div>
+      <div class="info-note" id="db-note">detectando almacenamiento...</div>
+    </div>
+  </div>
+
+  <nav class="tab-bar">
+    <button class="tab-btn active" id="tab-home" onclick="switchTab('home')">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>
+      Inicio
+    </button>
+    <button class="tab-btn" id="tab-edit" onclick="switchTab('edit')">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Editar
+    </button>
+    <button class="tab-btn" id="tab-info" onclick="switchTab('info')">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4m0 4h.01"/></svg>
+      Instalar
+    </button>
+  </nav>
+</div>
+
+<script>
+const COLORS = ['#e8c56a','#5b8dee','#9b7fe8','#4ecb8d','#e88a5b','#e8685b','#5be8c5'];
+const DB_NAME = 'cartera_db', STORE = 'kv', KEY = 'state';
+
+let state = {
+  btcAmount: 0.11362119, btcManual: null, btcCost: null,
+  funds: [{ id:1, name:'S&P 500', value:4859 }, { id:2, name:'Nasdaq', value:700 }],
+  nextFundId: 3
+};
+let btcPriceAuto = 84512, btcChange = null, donutInst = null, db = null;
+
+// ── IndexedDB ─────────────────────────────────────────────
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
+    r.onsuccess = e => res(e.target.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+function idbGet() {
+  return new Promise(res => {
+    try {
+      const tx = db.transaction(STORE, 'readonly');
+      const r = tx.objectStore(STORE).get(KEY);
+      r.onsuccess = () => res(r.result || null);
+      r.onerror = () => res(null);
+    } catch(e) { res(null); }
+  });
+}
+function idbSet(val) {
+  return new Promise(res => {
+    try {
+      const tx = db.transaction(STORE, 'readwrite');
+      const r = tx.objectStore(STORE).put(val, KEY);
+      r.onsuccess = () => res(true);
+      r.onerror = () => res(false);
+    } catch(e) { res(false); }
+  });
+}
+
+// ── localStorage fallback ─────────────────────────────────
+function lsGet() { try { const d = localStorage.getItem('cartera'); return d ? JSON.parse(d) : null; } catch(e) { return null; } }
+function lsSet(v) { try { localStorage.setItem('cartera', JSON.stringify(v)); return true; } catch(e) { return false; } }
+
+// ── LOAD ──────────────────────────────────────────────────
+async function loadData() {
+  let loaded = null, method = 'ninguno';
+  try {
+    db = await openDB();
+    loaded = await idbGet();
+    if (loaded) method = 'IndexedDB ✓';
+  } catch(e) { db = null; }
+
+  if (!loaded) {
+    loaded = lsGet();
+    if (loaded) method = 'localStorage ✓';
+    else method = 'sin datos previos';
+  }
+
+  if (loaded) state = { ...state, ...loaded };
+  setEl('db-note', 'almacenamiento: ' + method);
+  renderEditPage();
+  update();
+}
+
+// ── SAVE ──────────────────────────────────────────────────
+async function saveData() {
+  // collect all current input values into state
+  state.btcAmount = parseFloat(getEl('e-btc-amount').value) || 0;
+  const m = parseFloat(getEl('e-btc-manual').value);
+  state.btcManual = (!isNaN(m) && m > 0) ? m : null;
+  const c = parseFloat(getEl('e-btc-cost').value);
+  state.btcCost = (!isNaN(c) && c > 0) ? c : null;
+
+  let ok = false;
+  if (db) ok = await idbSet(state);
+  if (!ok) ok = lsSet(state);
+
+  if (ok) {
+    showToast('✓ Datos guardados');
+    setEl('save-status', 'Guardado · ' + new Date().toLocaleTimeString('es-ES'));
+  } else {
+    showToast('✗ No se pudo guardar', true);
+    setEl('save-status', 'Error al guardar — intenta de nuevo');
+  }
+  update();
+}
+
+// ── TOAST ─────────────────────────────────────────────────
+let toastT;
+function showToast(msg, err=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast' + (err ? ' error' : '');
+  clearTimeout(toastT);
+  requestAnimationFrame(() => t.classList.add('show'));
+  toastT = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// ── TABS ──────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  getEl('tab-' + tab).classList.add('active');
+  getEl('page-' + tab).classList.add('active');
+  if (tab === 'edit') renderEditPage();
+}
+
+// ── BTC PRICE ─────────────────────────────────────────────
+async function fetchPrice() {
+  try {
+    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur&include_24hr_change=true');
+    const d = await r.json();
+    if (d.bitcoin?.eur) { btcPriceAuto = d.bitcoin.eur; btcChange = d.bitcoin.eur_24h_change; }
+  } catch(e) {}
+  update();
+}
+
+// ── HELPERS ──────────────────────────────────────────────
+function getEl(id) { return document.getElementById(id); }
+function setEl(id, txt) { const e = getEl(id); if (e) e.textContent = txt; }
+function fmt(n, d=0) { return n.toLocaleString('es-ES', { minimumFractionDigits:d, maximumFractionDigits:d }); }
+function eur(n) { return fmt(n) + ' €'; }
+function getPrice() { return (state.btcManual && state.btcManual > 0) ? state.btcManual : btcPriceAuto; }
+
+// ── DASHBOARD UPDATE ──────────────────────────────────────
+function update() {
+  const price = getPrice();
+  const btcVal = state.btcAmount * price;
+  const fundsTotal = state.funds.reduce((s,f) => s + (f.value||0), 0);
+  const total = btcVal + fundsTotal;
+
+  setEl('h-total', fmt(total));
+  setEl('h-btc-price', eur(price));
+  if (btcChange !== null) {
+    const el = getEl('h-btc-change');
+    el.textContent = (btcChange >= 0 ? '+' : '') + btcChange.toFixed(2) + '%';
+    el.style.color = btcChange >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+
+  const btcPL = (state.btcCost && state.btcCost > 0) ? btcVal - state.btcCost * state.btcAmount : null;
+
+  const metrics = [
+    { lbl:'Bitcoin', val:eur(btcVal), sub:state.btcAmount.toFixed(5)+' BTC', color:COLORS[0] },
+    { lbl:'Fondos', val:eur(fundsTotal), sub:state.funds.length+' posición'+(state.funds.length!==1?'es':''), color:COLORS[1] },
+    { lbl:'Peso cripto', val:total>0?(btcVal/total*100).toFixed(1)+'%':'—', sub:'del total', color:COLORS[0] },
+    { lbl:'Peso fondos', val:total>0?(fundsTotal/total*100).toFixed(1)+'%':'—', sub:'del total', color:COLORS[1] },
+  ];
+  if (btcPL !== null) {
+    const pct = (btcPL/(state.btcCost*state.btcAmount)*100).toFixed(1);
+    metrics.push({ lbl:'P&L BTC', val:(btcPL>=0?'+':'')+eur(btcPL), sub:(btcPL>=0?'+':'')+pct+'%', color:btcPL>=0?'var(--green)':'var(--red)' });
+  }
+  getEl('metrics-grid').innerHTML = metrics.map(m =>
+    `<div class="metric-card" style="--card-color:${m.color}">
+      <div class="lbl">${m.lbl}</div>
+      <div class="val" style="color:${['var(--green)','var(--red)'].includes(m.color)?m.color:'var(--text)'}">${m.val}</div>
+      <div class="sub">${m.sub}</div>
+    </div>`).join('');
+
+  const items = [
+    { name:'Bitcoin', val:btcVal, qty:state.btcAmount.toFixed(6)+' BTC', type:'Criptomoneda', badge:'₿', bbg:'var(--accent-dim)', bc:'var(--accent)' },
+    ...state.funds.map((f,i) => ({ name:f.name, val:f.value||0, qty:eur(f.value||0), type:'Fondo', badge:f.name.slice(0,2).toUpperCase(), bbg:i%2===0?'var(--blue-dim)':'var(--purple-dim)', bc:i%2===0?'var(--blue)':'var(--purple)' }))
+  ];
+
+  getEl('positions-list').innerHTML = items.map((it,i) => {
+    const pct = total>0?(it.val/total*100).toFixed(1):'0.0';
+    const pl = (i===0 && btcPL!==null) ? `<div class="pos-pl" style="color:${btcPL>=0?'var(--green)':'var(--red)'}">${btcPL>=0?'+':''}${eur(btcPL)}</div>` : '';
+    return `<div class="position-row">
+      <div class="pos-badge" style="background:${it.bbg};color:${it.bc}">${it.badge}</div>
+      <div class="pos-info"><div class="pos-name">${it.name}</div><div class="pos-type">${it.qty} · ${it.type}</div></div>
+      <div class="pos-right"><div class="pos-val">${eur(it.val)}</div><div class="pos-pct">${pct}% del total</div>${pl}</div>
+    </div>`;
+  }).join('');
+
+  if (donutInst) donutInst.destroy();
+  donutInst = new Chart(getEl('donutChart'), {
+    type: 'doughnut',
+    data: { labels:items.map(x=>x.name), datasets:[{ data:items.map(x=>x.val), backgroundColor:items.map((_,i)=>COLORS[i%COLORS.length]), borderWidth:0, hoverOffset:6 }] },
+    options: { responsive:true, maintainAspectRatio:false, cutout:'70%',
+      plugins: { legend:{display:false}, tooltip:{ backgroundColor:'#1a1d24', borderColor:'rgba(255,255,255,0.08)', borderWidth:1, titleColor:'#f0ede8', bodyColor:'#6e717a', padding:10,
+        callbacks:{ label: ctx => ` ${ctx.label}: ${eur(ctx.raw)} (${total>0?(ctx.raw/total*100).toFixed(1):0}%)` } } } }
+  });
+  setEl('donut-n', items.length);
+  getEl('legend-list').innerHTML = items.map((x,i) =>
+    `<div class="legend-item"><div class="legend-dot" style="background:${COLORS[i%COLORS.length]}"></div><span class="legend-name">${x.name}</span><span class="legend-val">${eur(x.val)}</span><span class="legend-pct">${total>0?(x.val/total*100).toFixed(1):0}%</span></div>`).join('');
+}
+
+// ── EDIT PAGE ─────────────────────────────────────────────
+function renderEditPage() {
+  getEl('e-btc-amount').value = state.btcAmount || '';
+  getEl('e-btc-manual').value = state.btcManual || '';
+  getEl('e-btc-cost').value = state.btcCost || '';
+
+  const container = getEl('funds-edit-list');
+  container.innerHTML = '';
+  state.funds.forEach((f, i) => {
+    const color = COLORS[1 + (i % (COLORS.length-1))];
+    const div = document.createElement('div');
+    div.className = 'fund-card';
+    div.innerHTML = `
+      <div class="fund-card-hdr">
+        <div class="fund-dot" style="background:${color}"></div>
+        <input class="fund-name-input" type="text" value="${f.name}" placeholder="Nombre" data-id="${f.id}" data-f="name">
+        ${state.funds.length > 1 ? `<button class="btn-remove" onclick="removeFund(${f.id})">✕</button>` : ''}
+      </div>
+      <div class="fund-val-row">
+        <span class="fund-val-lbl">Valor €</span>
+        <input class="fund-val-input" type="number" inputmode="decimal" value="${f.value}" placeholder="0" data-id="${f.id}" data-f="value">
+      </div>`;
+    container.appendChild(div);
+  });
+
+  container.querySelectorAll('input[data-id]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const id = parseInt(inp.dataset.id), field = inp.dataset.f;
+      const fund = state.funds.find(x => x.id === id);
+      if (fund) fund[field] = field === 'value' ? (parseFloat(inp.value)||0) : inp.value;
+      update();
+    });
+  });
+}
+
+function addFund() {
+  state.funds.push({ id: state.nextFundId++, name: 'Nuevo fondo', value: 0 });
+  renderEditPage(); update();
+}
+function removeFund(id) {
+  state.funds = state.funds.filter(x => x.id !== id);
+  renderEditPage(); update();
+}
+
+// ── INIT ──────────────────────────────────────────────────
+loadData();
+fetchPrice();
+setInterval(fetchPrice, 60000);
+</script>
+</body>
+</html>
